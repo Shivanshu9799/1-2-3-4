@@ -1,0 +1,15 @@
+import pandas as pd
+
+# Load CSV1 and CSV2
+csv1 = pd.read_csv(r'C:/1234/ERG10_tophits.csv')  # DrugBank ID in column index 1
+csv2 = pd.read_csv(r'C:/1234/drugbank_all_drugbank_vocabulary.csv/drugbank vocabulary.csv')  # DrugBank ID in column index 0
+
+# Ensure column names for merge
+csv1.columns.values[1] = 'DrugBank_ID'
+csv2.columns.values[0] = 'DrugBank_ID'
+
+# Merge: Keep only rows from csv1, and bring matching data from csv2
+merged = pd.merge(csv1, csv2, on='DrugBank_ID', how='left')
+
+# Save final merged file
+merged.to_csv('ERG10_tophits_merged.csv', index=False)
