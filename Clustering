@@ -1,0 +1,43 @@
+import pandas as pd
+from rdkit import Chem
+from rdkit.Chem.Scaffolds import MurckoScaffold
+from rdkit.Chem import AllChem, DataStructs
+from rdkit.ML.Cluster import Butina
+import numpy as np
+
+# Load your CSV
+df = pd.read_csv(r'C:/1234/ERG10_tophits_md.csv')
+df = df[df['SMILES'].notnull()]  # Remove NaN
+df = df[df['SMILES'].apply(lambda x: isinstance(x, str) and x.strip() != '')]  # 
+smiles_list = df['SMILES'].tolist()
+
+# Extract scaffolds
+scaffolds = [MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smi) for smi in smiles_list]
+
+# Generate fingerprints
+fps = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(sc), 2, nBits=2048) for sc in scaffolds]
+
+# Compute similarity matrix
+n = len(fps)
+sim_matrix = np.zeros((n, n))
+for i in range(n):
+    for j in range(i+1, n):
+        sim = DataStructs.TanimotoSimilarity(fps[i], fps[j])
+        sim_matrix[i, j] = sim_matrix[j, i] = sim
+
+# Prepare for Butina clustering
+dists = []
+for i in range(n):
+    for j in range(i+1, n):
+        dists.append(1.0 - sim_matrix[i, j])
+clusters = Butina.ClusterData(dists, n, 0.5,True)
+#lusters = Butina.ClusterData(dists, nPts=n, cutoff=0.3, isDistData=True)
+
+
+cluster_labels = [None] * len(smiles_list)
+for cluster_id, cluster in enumerate(clusters):
+    for idx in cluster:
+        cluster_labels[idx] = cluster_id
+
+df['Cluster'] = cluster_labels
+df.to_csv('clustered_hit.csv', index=False)
