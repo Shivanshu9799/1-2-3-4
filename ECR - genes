@@ -1,0 +1,46 @@
+import numpy as np
+import pandas as pd
+
+# Step 1: List your input CSV files
+csv_files = [
+    r'C:/1234/Vs Results/results_6L2G_Drugbank.csv',
+    r'C:/1234/Vs Results/results_LYS9_Drugbank.csv',
+    r'C:/1234/Vs Results/results_MET16_Drugbank_updated.csv',
+    r'C:/1234/Vs Results/results_TRR1_DB.csv'
+]
+
+alpha = 0.01
+# Step 2: Gather all unique DrugBank IDs
+rank_dfs = []
+for file in csv_files:
+    df = pd.read_csv(file)  # Assumes headers are present
+    df = df[['Drugbank_ID', 'Rank']]
+    rank_dfs.append(df)
+
+# Step 2: Collect all unique drugbank_ids
+all_ids = set()
+for df in rank_dfs:
+    all_ids.update(df['Drugbank_ID'].unique())
+
+all_ids_df = pd.DataFrame({'Drugbank_ID': sorted(all_ids)})
+
+# Step 3: Normalize ranks (fill missing with max_rank + 1)
+normalized_ranks = []
+for df in rank_dfs:
+    merged = all_ids_df.merge(df, on='Drugbank_ID', how='left')
+    max_rank = merged['Rank'].max(skipna=True)
+    merged['Rank'] = merged['Rank'].fillna(max_rank + 1)
+    normalized_ranks.append(merged['Rank'])
+
+# Step 4: Compute ECR scores
+ecr_scores = sum(np.exp(-alpha * r) for r in normalized_ranks)
+all_ids_df['ECR_score'] = ecr_scores
+
+# Step 5: Sort by ECR score and assign final ranks
+all_ids_df = all_ids_df.sort_values(by='ECR_score', ascending=False)
+all_ids_df['ECR_rank'] = range(1, len(all_ids_df) + 1)
+
+# Step 6: Save to CSV
+all_ids_df.to_csv('ecr_final_ranking.csv', index=False)
+
+print("✅ ECR ranking saved to 'ecr_final_ranking.csv'")
